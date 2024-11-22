@@ -1,64 +1,94 @@
 #include "rfid_driver.h"
 #include <stdio.h>
-#include <string.h>
+#include "nrf_delay.h"
 
-// Pointer to the initialized TWI manager
-static const nrf_twi_mngr_t *i2c_manager = NULL;
-
-// Initialize the RFID reader
-void rfid_init(const nrf_twi_mngr_t *manager)
-{
-    i2c_manager = manager;
-
-    // Perform a WHO_AM_I check or similar (replace 0x00 and expected value)
-    uint8_t who_am_i_reg = 0x00; // Adjust to actual WHO_AM_I register
-    uint8_t who_am_i_val;
+// Initialize RFID by reading its version and status registers
+void rfid_init(nrf_twi_mngr_t const *twi_mngr) {
+    uint8_t version = 0;
+    uint8_t status = 0;
 
     nrf_twi_mngr_transfer_t const transfers[] = {
-        NRF_TWI_MNGR_WRITE(RFID_I2C_ADDRESS, &who_am_i_reg, 1, NRF_TWI_MNGR_NO_STOP),
-        NRF_TWI_MNGR_READ(RFID_I2C_ADDRESS, &who_am_i_val, 1)};
+        NRF_TWI_MNGR_WRITE(SPARKFUN_RFID_ADDR, (uint8_t[]){RFID_VERSION_REG}, 1, NRF_TWI_MNGR_NO_STOP),
+        NRF_TWI_MNGR_READ(SPARKFUN_RFID_ADDR, &version, 1, 0),
+        NRF_TWI_MNGR_WRITE(SPARKFUN_RFID_ADDR, (uint8_t[]){RFID_STATUS_REG}, 1, NRF_TWI_MNGR_NO_STOP),
+        NRF_TWI_MNGR_READ(SPARKFUN_RFID_ADDR, &status, 1, 0),
+    };
 
-    ret_code_t err_code = nrf_twi_mngr_perform(i2c_manager, NULL, transfers, 2, NULL);
-    if (err_code != NRF_SUCCESS)
-    {
-        printf("RFID reader initialization failed: 0x%X\n", err_code);
-    }
-    else
-    {
-        printf("RFID reader WHO_AM_I: 0x%X\n", who_am_i_val);
+    ret_code_t err_code = nrf_twi_mngr_perform(twi_mngr, NULL, transfers, 4, NULL);
+    if (err_code == NRF_SUCCESS) {
+        printf("RFID Version: 0x%02X\n", version);
+        printf("RFID Status: 0x%02X\n", status);
+    } else {
+        printf("RFID initialization failed, error: 0x%lX\n", err_code);
     }
 }
 
-// Write data to a specific block on the RFID card
-uint8_t rfid_write_block(uint8_t block, const uint8_t *data, size_t length)
-{
-    uint8_t tx_buf[17] = {block}; // First byte is the block number
-    memcpy(&tx_buf[1], data, length);
+// Scan I2C bus for devices
+void rfid_scan_bus(nrf_twi_mngr_t const *twi_mngr) {
+    printf("\nScanning I2C bus for devices...\n");
+    printf("   0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
 
-    nrf_twi_mngr_transfer_t const transfer = NRF_TWI_MNGR_WRITE(RFID_I2C_ADDRESS, tx_buf, sizeof(tx_buf), 0);
-    ret_code_t err_code = nrf_twi_mngr_perform(i2c_manager, NULL, &transfer, 1, NULL);
+    for (uint8_t address = 1; address < 127; address++) {
+        nrf_twi_mngr_transfer_t const transfer = NRF_TWI_MNGR_WRITE(address, NULL, 0, 0);
+        ret_code_t err_code = nrf_twi_mngr_perform(twi_mngr, NULL, &transfer, 1, NULL);
 
-    if (err_code != NRF_SUCCESS)
-    {
-        printf("RFID Write Error: 0x%X\n", err_code);
-        return 0;
+        if (address % 16 == 0) {
+            printf("\n%02X:", address & 0xF0);
+        }
+
+        if (err_code == NRF_SUCCESS) {
+            printf(" %02X", address);
+        } else {
+            printf(" --");
+        }
     }
-    return 1;
+    printf("\n\nScan complete!\n");
 }
 
-// Read data from a specific block on the RFID card
-uint8_t rfid_read_block(uint8_t block, uint8_t *buffer, size_t length)
-{
+// Read a single byte from a register
+bool rfid_read_register(nrf_twi_mngr_t const *twi_mngr, uint8_t reg, uint8_t *data) {
     nrf_twi_mngr_transfer_t const transfers[] = {
-        NRF_TWI_MNGR_WRITE(RFID_I2C_ADDRESS, &block, 1, NRF_TWI_MNGR_NO_STOP),
-        NRF_TWI_MNGR_READ(RFID_I2C_ADDRESS, buffer, length)};
+        NRF_TWI_MNGR_WRITE(SPARKFUN_RFID_ADDR, &reg, 1, NRF_TWI_MNGR_NO_STOP),
+        NRF_TWI_MNGR_READ(SPARKFUN_RFID_ADDR, data, 1, 0),
+    };
 
-    ret_code_t err_code = nrf_twi_mngr_perform(i2c_manager, NULL, transfers, 2, NULL);
-
-    if (err_code != NRF_SUCCESS)
-    {
-        printf("RFID Read Error: 0x%X\n", err_code);
-        return 0;
+    ret_code_t err_code = nrf_twi_mngr_perform(twi_mngr, NULL, transfers, 2, NULL);
+    if (err_code != NRF_SUCCESS) {
+        printf("Read failed, error: 0x%lX\n", err_code);
+        return false;
     }
-    return 1;
+    return true;
+}
+
+// Write a single byte to a register
+bool rfid_write_register(nrf_twi_mngr_t const *twi_mngr, uint8_t reg, uint8_t data) {
+    uint8_t buffer[2] = {reg, data};
+    nrf_twi_mngr_transfer_t const transfer = NRF_TWI_MNGR_WRITE(SPARKFUN_RFID_ADDR, buffer, sizeof(buffer), 0);
+
+    ret_code_t err_code = nrf_twi_mngr_perform(twi_mngr, NULL, &transfer, 1, NULL);
+    if (err_code != NRF_SUCCESS) {
+        printf("Write failed, error: 0x%lX\n", err_code);
+        return false;
+    }
+    return true;
+}
+
+// Function to check if a tag is present
+bool rfid_check_tag_present(nrf_twi_mngr_t const *twi_mngr) {
+    uint8_t status = 0;
+
+    // Read the status register
+    nrf_twi_mngr_transfer_t const transfers[] = {
+        NRF_TWI_MNGR_WRITE(SPARKFUN_RFID_ADDR, (uint8_t[]){RFID_STATUS_REG}, 1, NRF_TWI_MNGR_NO_STOP),
+        NRF_TWI_MNGR_READ(SPARKFUN_RFID_ADDR, &status, 1, 0),
+    };
+
+    ret_code_t err_code = nrf_twi_mngr_perform(twi_mngr, NULL, transfers, 2, NULL);
+    if (err_code != NRF_SUCCESS) {
+        printf("Failed to read status register, error: 0x%lX\n", err_code);
+        return false;
+    }
+
+    // Check if the LSB (bit 0) indicates a tag is present
+    return (status & 0x01) != 0;
 }

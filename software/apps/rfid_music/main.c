@@ -1,59 +1,46 @@
-#include "nrf_drv_twi.h"
-#include "rfid_driver.h"
 #include <stdio.h>
+#include "nrf_drv_twi.h"
+#include "nrf_twi_mngr.h"
+#include "rfid_driver.h"
+#include "nrf_delay.h"
 
-// TWI (I2C) instance ID
-#define TWI_INSTANCE_ID 0
-#ifndef NRF_GPIO_PIN_MAP
-#define NRF_GPIO_PIN_MAP(port, pin) ((port << 5) | (pin & 0x1F))
-#endif
+// Define GPIO pins
+#define TWI_SCL_PIN 19
+#define TWI_SDA_PIN 20
 
-// TWI instance
-static const nrf_drv_twi_t m_twi = NRF_DRV_TWI_INSTANCE(TWI_INSTANCE_ID);
+// TWI Manager instance
+NRF_TWI_MNGR_DEF(m_twi_mngr, 5, 0);  // Max 5 queued transfers
 
-// TWI initialization
-void twi_init(void)
-{
-    ret_code_t err_code;
-
-    // Configure TWI
-    nrf_drv_twi_config_t config = {
-        .scl = NRF_GPIO_PIN_MAP(0, 27), // Replace with 27 if NRF_GPIO_PIN_MAP is undefined
-        .sda = NRF_GPIO_PIN_MAP(0, 26), // Replace with 26 if NRF_GPIO_PIN_MAP is undefined
-        .frequency = NRF_DRV_TWI_FREQ_100K,
+void twi_init(void) {
+    nrf_drv_twi_config_t const config = {
+        .scl                = TWI_SCL_PIN,
+        .sda                = TWI_SDA_PIN,
+        .frequency          = NRF_TWIM_FREQ_100K,
         .interrupt_priority = APP_IRQ_PRIORITY_HIGH,
-        .clear_bus_init = false};
+        .clear_bus_init     = false
+    };
 
-    // Initialize TWI
-    err_code = nrf_drv_twi_init(&m_twi, &config, NULL, NULL);
+    ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &config);
     APP_ERROR_CHECK(err_code);
 
-    // Enable TWI
-    nrf_drv_twi_enable(&m_twi);
+    printf("TWI Manager initialized successfully\n");
 }
 
-int main(void)
-{
+int main(void) {
     printf("Starting RFID Project...\n");
 
     // Initialize TWI
     twi_init();
 
-    // Initialize RFID reader
-    rfid_init(&m_twi);
+    // Scan the I2C bus
+    rfid_scan_bus(&m_twi_mngr);
 
-    // Write data to block 1
-    uint8_t write_data[16] = "Hello, RFID!";
-    if (rfid_write_block(1, write_data, sizeof(write_data)))
-    {
-        printf("Data written successfully.\n");
-    }
+    // Initialize the RFID reader
+    rfid_init(&m_twi_mngr);
 
-    // Read data from block 1
-    uint8_t read_data[16] = {0};
-    if (rfid_read_block(1, read_data, sizeof(read_data)))
-    {
-        printf("Data read from block 1: %s\n", read_data);
+    // Main loop
+    while (1) {
+        nrf_delay_ms(1000);
     }
 
     return 0;
