@@ -25,7 +25,7 @@
 #define BYTES_IN_BUFFER 4
 
 typedef struct {
-    char tag[7]; // 6-character tag + null terminator
+    char tag[13]; // 6-character tag + null terminator
     uint32_t time; // Timestamp in milliseconds
 } rfid_data_t;
 
