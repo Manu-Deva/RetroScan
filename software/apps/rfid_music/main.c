@@ -5,79 +5,72 @@
 #include "nrf_delay.h"
 #include "app_timer.h"
 #include "microbit_v2.h"
+#include "ili9341.h"
 
 #define POLLING_INTERVAL APP_TIMER_TICKS(500)  // Poll every 500ms
 
 // TWI Manager instance
-NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);  
+NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);
 APP_TIMER_DEF(rfid_timer);
-
-#define NRF_TWI_MNGR_ENABLED 1
-
-
-// void twi_init(void) {
-//     nrf_drv_twi_config_t config = NRF_DRV_TWI_DEFAULT_CONFIG;
-	 
-//     config.scl                = I2C_QWIIC_SCL;
-//     config.sda                = I2C_QWIIC_SDA;
-//     config.frequency          = NRF_TWIM_FREQ_100K;
-//     config.interrupt_priority = APP_IRQ_PRIORITY_HIGH;
-//     config.clear_bus_init     = false;
-
-//     ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &config);
-//     APP_ERROR_CHECK(err_code);
-
-//     printf("TWI Manager initialized successfully\n");
-// }
 
 void rfid_timer_callback(void *context) {
     rfid_data_t tag_data; // Structure to hold the RFID tag ID and timestamp
 
     // Attempt to read an RFID tag
     tag_data = rfid_read_tag(&m_twi_mngr);
-	rfid_check_tag_present(&m_twi_mngr);
 
-    // Check if the tag data is valid
     if (tag_data.tag[0] != '\0') {
         // Print the tag information
         printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
+
+        // Display tag data on the screen
+        ili9341_fill_screen(0xFF, 0xFF, 0xFF); // Clear the screen to white
+        ili9341_draw_string(10, 10, "RFID Tag Detected", 1, 0x00, 0x00, 0x00);
+        ili9341_draw_string(10, 30, tag_data.tag, 1, 0x00, 0x00, 0x00);
+
+        // Example: Based on tag ID, show additional info
+        if (strcmp(tag_data.tag, "123456") == 0) {
+            ili9341_draw_string(10, 50, "Type: Vinyl", 1, 0x00, 0x00, 0x00);
+            ili9341_draw_string(10, 70, "Artist: The Beatles", 1, 0x00, 0x00, 0x00);
+        } else if (strcmp(tag_data.tag, "789012") == 0) {
+            ili9341_draw_string(10, 50, "Type: VHS", 1, 0x00, 0x00, 0x00);
+            ili9341_draw_string(10, 70, "Title: Pulp Fiction", 1, 0x00, 0x00, 0x00);
+        }
     } else {
         // No tag detected
         printf("No tag detected or read failed.\n");
     }
 
-	rfid_clear_tags(&m_twi_mngr);
+    rfid_clear_tags(&m_twi_mngr); // Clear RFID tag buffer
 }
 
 int main(void) {
+    printf("Starting application.\n");
 
-    printf("Starting RFID.\n");
+    // Initialize TWI Manager
+    nrf_drv_twi_config_t twi_config = NRF_DRV_TWI_DEFAULT_CONFIG;
+    twi_config.scl = I2C_QWIIC_SCL;
+    twi_config.sda = I2C_QWIIC_SDA;
+    twi_config.frequency = NRF_TWIM_FREQ_100K;
 
-    nrf_drv_twi_config_t config = NRF_DRV_TWI_DEFAULT_CONFIG;
-	 
-    config.scl                = I2C_QWIIC_SCL;
-    config.sda                = I2C_QWIIC_SDA;
-    config.frequency          = NRF_TWIM_FREQ_100K;
-    config.interrupt_priority = APP_IRQ_PRIORITY_HIGH;
-    // config.clear_bus_init     = false;
-
-    ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &config);
+    ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &twi_config);
     APP_ERROR_CHECK(err_code);
     printf("TWI Manager initialized successfully\n");
 
-	rfid_init(&m_twi_mngr);
-    rfid_scan_bus(&m_twi_mngr);
-	
+    // Initialize RFID
+    rfid_init(&m_twi_mngr);
+
+    // Initialize Display
+    ili9341_init();
+
+    // App timer setup
     app_timer_init();
     app_timer_create(&rfid_timer, APP_TIMER_MODE_REPEATED, rfid_timer_callback);
     app_timer_start(rfid_timer, POLLING_INTERVAL, NULL);
 
     while (1) {
-        nrf_delay_ms(1000); // Poll every 500ms
-
+        nrf_delay_ms(1000);
     }
 
     return 0;
-
- 
 }
