@@ -161,10 +161,6 @@ int main(void)
     const char *song3 = "Octopus Garden";
     const char *genre = "Rock";
     const char *year = "1969";
-    const char *vinyl_weight = "0.3";
-
-    display_vinyl_record(artist, title, song1, song2, song3, genre, year, vinyl_weight);
-
     // Example data for VHS movie
     const char *director = "Tarantino";
     const char *movie_title = "Pulp Fiction";
@@ -173,9 +169,14 @@ int main(void)
     const char *actor3 = "Samuel Jackson";
     const char *movie_genre = "Crime";
     const char *movie_year = "1994";
-    const char *vhs_weight = "1";
 
-    display_vhs_movie(director, movie_title, actor1, actor2, actor3, movie_genre, movie_year, vhs_weight);
+    // Read in weight sensor data and change here
+    const char *sensed_weight = "0.3";
+
+    // If RFID reads in a vinyl tag:
+    display_vinyl_record(artist, title, song1, song2, song3, genre, year, sensed_weight);
+    // Elif RFID reads in a vhs tag
+    display_vhs_movie(director, movie_title, actor1, actor2, actor3, movie_genre, movie_year, sensed_weight);
 
     while (1)
     {
