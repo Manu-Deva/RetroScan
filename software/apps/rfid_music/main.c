@@ -1,5 +1,24 @@
 #include <stdio.h>
+#include "nrf_drv_twi.h"
+#include "nrf_twi_mngr.h"
+#include "rfid_driver.h"
 #include "ili9341.h"
+#include "nrf_delay.h"
+#include "app_timer.h"
+#include "microbit_v2.h"
+
+#define POLLING_INTERVAL APP_TIMER_TICKS(500) // Poll every 500ms
+
+// TWI Manager instance
+NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);
+APP_TIMER_DEF(rfid_timer);
+
+#define VINYL_TAG "VINYL01" // Example RFID tag for vinyl records
+#define VHS_TAG "VHS001"    // Example RFID tag for VHS tapes
+
+// Function prototypes
+void rfid_timer_callback(void *context);
+void process_rfid_tag(const char *tag_id);
 
 #define TFT_WIDTH 240
 #define TFT_HEIGHT 320
@@ -149,10 +168,27 @@ void display_vhs_movie(const char *director, const char *title, const char *acto
     draw_vhs_icon(TFT_WIDTH - 40, TFT_HEIGHT - 20);
 }
 
-int main(void)
+void rfid_timer_callback(void *context)
 {
-    ili9341_init();
+    rfid_data_t tag_data = rfid_read_tag(&m_twi_mngr);
 
+    if (tag_data.tag[0] != '\0')
+    {
+        printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
+
+        // Process the tag to update the display
+        process_rfid_tag(tag_data.tag);
+    }
+    else
+    {
+        printf("No tag detected or read failed.\n");
+    }
+
+    rfid_clear_tags(&m_twi_mngr);
+}
+
+void process_rfid_tag(const char *tag_id)
+{
     // Example data for vinyl record
     const char *artist = "The Beatles";
     const char *title = "Abbey Road";
@@ -161,6 +197,8 @@ int main(void)
     const char *song3 = "Octopus Garden";
     const char *genre = "Rock";
     const char *year = "1969";
+    const char *vinyl_weight = "0.3";
+
     // Example data for VHS movie
     const char *director = "Tarantino";
     const char *movie_title = "Pulp Fiction";
@@ -169,17 +207,58 @@ int main(void)
     const char *actor3 = "Samuel Jackson";
     const char *movie_genre = "Crime";
     const char *movie_year = "1994";
+    const char *vhs_weight = "1";
 
-    // Read in weight sensor data and change here
-    const char *sensed_weight = "0.3";
+    // Check the tag ID and update the display accordingly
+    if (strncmp(tag_id, VINYL_TAG, strlen(VINYL_TAG)) == 0)
+    {
+        // Display vinyl record info
+        display_vinyl_record(artist, title, song1, song2, song3, genre, year, vinyl_weight);
+    }
+    else if (strncmp(tag_id, VHS_TAG, strlen(VHS_TAG)) == 0)
+    {
+        // Display VHS movie info
+        display_vhs_movie(director, movie_title, actor1, actor2, actor3, movie_genre, movie_year, vhs_weight);
+    }
+    else
+    {
+        // Unknown tag: clear the display
+        ili9341_fill_screen(0xFF, 0xFF, 0xFF); // Fill screen with white
+        display_header("Unknown Tag");
+    }
+}
 
-    // If RFID reads in a vinyl tag:
-    display_vinyl_record(artist, title, song1, song2, song3, genre, year, sensed_weight);
-    // Elif RFID reads in a vhs tag
-    display_vhs_movie(director, movie_title, actor1, actor2, actor3, movie_genre, movie_year, sensed_weight);
+int main(void)
+{
+    printf("Starting RFID and Display.\n");
 
+    // Initialize TWI manager
+    nrf_drv_twi_config_t twi_config = NRF_DRV_TWI_DEFAULT_CONFIG;
+    twi_config.scl = I2C_QWIIC_SCL;
+    twi_config.sda = I2C_QWIIC_SDA;
+    twi_config.frequency = NRF_TWIM_FREQ_100K;
+    twi_config.interrupt_priority = APP_IRQ_PRIORITY_HIGH;
+
+    ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &twi_config);
+    APP_ERROR_CHECK(err_code);
+    printf("TWI Manager initialized successfully.\n");
+
+    // Initialize RFID
+    rfid_init(&m_twi_mngr);
+    rfid_scan_bus(&m_twi_mngr);
+
+    // Initialize ILI9341 display
+    ili9341_init();
+
+    // Start RFID polling timer
+    app_timer_init();
+    app_timer_create(&rfid_timer, APP_TIMER_MODE_REPEATED, rfid_timer_callback);
+    app_timer_start(rfid_timer, POLLING_INTERVAL, NULL);
+
+    // Main loop
     while (1)
     {
+        nrf_delay_ms(1000); // Add delay for low-power consumption
     }
 
     return 0;

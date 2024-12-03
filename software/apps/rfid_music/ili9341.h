@@ -89,4 +89,4 @@ static const uint8_t font8x8_basic[128][8] = {
     [57] = {0x3C, 0x66, 0x66, 0x66, 0x3E, 0x06, 0x66, 0x3C}, // 9
 };
 
-#endif // ILI9341_H
+#endif
