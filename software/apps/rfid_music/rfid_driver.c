@@ -40,6 +40,7 @@ void rfid_scan_bus(nrf_twi_mngr_t const *twi_mngr) {
 // }
 
 rfid_data_t rfid_read_tag(nrf_twi_mngr_t const *twi_mngr) {
+	printf("got to rfid_read_tag\n");
     rfid_data_t rfid_data = { .tag = {0}, .time = 0 };
     uint8_t request_bytes = TAG_AND_TIME_REQUEST;
     uint8_t buffer[TAG_AND_TIME_REQUEST] = {0};

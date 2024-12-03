@@ -149,7 +149,7 @@ void display_rfid_tag_info(const char *tag_id) {
     // ili9341_fill_screen(0xFF, 0xFF, 0xFF); // Clear screen to white
 
     if (tag_info) {
-		display_vinyl_record(tag_info->artist, tag_info->title, tag_info->song1,tag_info->song2,tag_info->song3,tag_info->genre,tag_info->year, tag_info->sensed_weight)
+		display_vinyl_record(tag_info->artist, tag_info->title, tag_info->song1,tag_info->song2,tag_info->song3,tag_info->genre,tag_info->year, tag_info->sensed_weight);
        
     } else {
         // Display "unknown tag" message
@@ -202,12 +202,15 @@ int main(void) {
 
     // Initialize RFID
     rfid_init(&m_twi_mngr);
+	printf("got to rfid init\n");
 
     // Initialize Display
     ili9341_init();
+	printf("got to display init\n");
 
     // App timer setup
     app_timer_init();
+	printf("got to app timer init\n");
     app_timer_create(&rfid_timer, APP_TIMER_MODE_REPEATED, rfid_timer_callback);
     app_timer_start(rfid_timer, POLLING_INTERVAL, NULL);
 
