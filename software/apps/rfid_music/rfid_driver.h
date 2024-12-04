@@ -24,9 +24,8 @@
 #define MAX_TAG_STORAGE 20
 #define BYTES_IN_BUFFER 4
 
-typedef struct
-{
-    char tag[13];  // 6-character tag + null terminator
+typedef struct {
+    char tag[13]; // 6-character tag + null terminator
     uint32_t time; // Timestamp in milliseconds
 } rfid_data_t;
 
@@ -41,3 +40,4 @@ static void rfid_write_register(uint8_t i2c_addr, uint8_t reg_addr, uint8_t data
 void rfid_check_tag_present(nrf_twi_mngr_t const *twi_mngr);
 
 #endif
+

@@ -36,12 +36,7 @@ void rfid_scan_bus(nrf_twi_mngr_t const *twi_mngr)
     printf("\n\nScan complete!\n");
 }
 
-// // Helper function to convert a nibble (4 bits) to its ASCII character
-// char nibble_to_ascii(uint8_t nibble) {
-//     static const char hex_chars[] = "0123456789ABCDEF";
-//     return hex_chars[nibble & 0x0F];
-// }
-
+// Read RFID tag and return tag data structure
 rfid_data_t rfid_read_tag(nrf_twi_mngr_t const *twi_mngr)
 {
     rfid_data_t rfid_data = {.tag = {0}, .time = 0};
@@ -80,24 +75,6 @@ rfid_data_t rfid_read_tag(nrf_twi_mngr_t const *twi_mngr)
     // Store the decoded tag in rfid_data structure
     strncpy(rfid_data.tag, decoded_tag, sizeof(rfid_data.tag) - 1);
 
-    // // Convert each individual hex digit back to ASCII
-    // // Assuming the tag data is in the first 5 bytes of the buffer
-    // int tag_bytes = 6; // Adjust based on your actual tag data length
-    // int decoded_tag_length = tag_bytes * 2;
-    // char decoded_tag[decoded_tag_length + 1]; // +1 for null terminator
-    // for (int i = 0; i < tag_bytes; i++) {
-    //     uint8_t byte = buffer[i];
-    //     // High nibble
-    //     decoded_tag[2 * i] = nibble_to_ascii(byte >> 4);
-    //     // Low nibble
-    //     decoded_tag[2 * i + 1] = nibble_to_ascii(byte);
-    // }
-    // decoded_tag[decoded_tag_length] = '\0'; // Null-terminate the string
-
-    // // Store the decoded tag in rfid_data structure
-    // strncpy(rfid_data.tag, decoded_tag, sizeof(rfid_data.tag) - 1);
-    // rfid_data.tag[sizeof(rfid_data.tag) - 1] = '\0'; // Ensure null term
-
     // Parse the timestamp
     rfid_data.time = (buffer[6] << 24) | (buffer[7] << 16) | (buffer[8] << 8) | buffer[9];
 
@@ -108,6 +85,7 @@ rfid_data_t rfid_read_tag(nrf_twi_mngr_t const *twi_mngr)
     return rfid_data;
 }
 
+// Clear RFID tag buffer
 void rfid_clear_tags(nrf_twi_mngr_t const *twi_mngr)
 {
     uint8_t request_bytes = TAG_AND_TIME_REQUEST;
@@ -133,6 +111,7 @@ void rfid_clear_tags(nrf_twi_mngr_t const *twi_mngr)
 static uint8_t rfid_read_register(uint8_t i2c_addr, uint8_t reg_addr)
 {
     uint8_t rx_buf = 0;
+
     nrf_twi_mngr_transfer_t const read_transfer[] = {
         NRF_TWI_MNGR_WRITE(i2c_addr, &reg_addr, 1, NRF_TWI_MNGR_NO_STOP),
         NRF_TWI_MNGR_READ(i2c_addr, &rx_buf, 1, 0),
