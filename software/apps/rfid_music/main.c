@@ -8,8 +8,9 @@
 #include "microbit_v2.h"
 
 #define POLLING_INTERVAL APP_TIMER_TICKS(500) 
-#define VINYL_TAG "3A006C84D200" 
-#define VHS_TAG "3A006C762F0F"    
+#define ABBEY_ROAD "3A006C84D200" 
+#define PULP_FICTION "3A006C762F0F"    
+#define IN_RAINBOWS "00000015C9DC"
 
 #define MAX_TAGS 10 
 #define TFT_WIDTH 240
@@ -33,6 +34,7 @@ typedef struct {
 static tag_info_t tag_info_table[MAX_TAGS] = {
     { "3A006C84D200", "Vinyl", "The Beatles", "Abbey Road", "Come Together", "Something", "Octopus Garden", "Rock", "1969", "0.3" },
     { "3A006C762F0F", "VHS", "Quentin Tarantino", "Pulp Fiction", "John Travolta", "Uma Thurman", "Samuel Jackson", "Crime", "1994", "1.0" },
+	{ "00000015C9DC", "Vinyl", "Radiohead", "In Rainbows", "All I Need", "Weird Fishes", "Videotape Garden", "Rock", "2007", "0.3" },
     // Add more entries as needed
 };
 static const size_t tag_info_count = sizeof(tag_info_table) / sizeof(tag_info_table[0]);
@@ -225,10 +227,13 @@ void process_rfid_tag(const char *tag_id) {
 
     if (tag_info) {
 
-		if (strncmp(tag_id, VINYL_TAG, strlen(VINYL_TAG)) == 0) {
+		if (strncmp(tag_id, ABBEY_ROAD, strlen(ABBEY_ROAD)) == 0) {
             display_vinyl_record(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
-        } else if (strncmp(tag_id, VHS_TAG, strlen(VHS_TAG)) == 0) {
+        } else if (strncmp(tag_id, PULP_FICTION, strlen(PULP_FICTION)) == 0) {
             display_vhs_movie(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
+        }
+		else if (strncmp(tag_id, IN_RAINBOWS, strlen(IN_RAINBOWS)) == 0) {
+            display_vinyl_record(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
         }
         is_displaying_tag = true;
         strcpy(last_displayed_tag, tag_id);

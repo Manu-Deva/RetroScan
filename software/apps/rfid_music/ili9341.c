@@ -304,3 +304,4 @@ void draw_vhs_icon(uint16_t x, uint16_t y)
 
     // Right reel (white circle)
     draw_circle(rect_x + 45, rect_y + 12.5, 6, 0xFF, 0xFF, 0xFF);
+}
