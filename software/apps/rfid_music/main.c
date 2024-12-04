@@ -170,7 +170,9 @@ void display_vhs_movie(const char *director, const char *title, const char *acto
 
 void rfid_timer_callback(void *context)
 {
-    rfid_data_t tag_data = rfid_read_tag(&m_twi_mngr);
+	rfid_data_t tag_data; 
+
+    tag_data = rfid_read_tag(&m_twi_mngr);
 
     if (tag_data.tag[0] != '\0')
     {
