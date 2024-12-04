@@ -2,42 +2,29 @@
 #include "nrf_drv_twi.h"
 #include "nrf_twi_mngr.h"
 #include "rfid_driver.h"
+#include "ili9341.h"
 #include "nrf_delay.h"
 #include "app_timer.h"
 #include "microbit_v2.h"
-#include "ili9341.h"
 
-#define POLLING_INTERVAL APP_TIMER_TICKS(500)  // Poll every 500ms
+#define POLLING_INTERVAL APP_TIMER_TICKS(500) // Poll every 500ms
 
 // TWI Manager instance
 NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);
 APP_TIMER_DEF(rfid_timer);
 
+#define VINYL_TAG "3A006C84D200" // Example RFID tag for vinyl records
+#define VHS_TAG "3A006C762F0F"    // Example RFID tag for VHS tapes
+
+static char last_displayed_tag[13] = "";
+static bool is_displaying_tag = false;  // Whether a valid tag is currently displayed
+
+// Function prototypes
+void rfid_timer_callback(void *context);
+void process_rfid_tag(const char *tag_id);
+
 #define TFT_WIDTH 240
 #define TFT_HEIGHT 320
-
-typedef struct {
-    const char *tag_id;         // RFID tag ID
-    const char *type;           // Type of item (e.g., "Vinyl", "VHS")
-	const char *artist;
-    const char *title;          // Title or description
-	const char* song1;
-	const char* song2;
-	const char* song3;
-	const char *genre;
-	const char *year;
-	const char *sensed_weight
-} tag_info_t;
-
-// Lookup table for tag information
-static const tag_info_t tag_info_table[] = {
-    { "3A006C84D200", "Vinyl", "The Beatles", "Abbey Road", "Come Together", "Something", "Octopus Garden", "Rock", "1969", "0.3"},
-    { "3A006C762F0F", "VHS", "Pulp Fiction", "Director: Tarantino" },
-    { "3A006C6AE3DF", "Vinyl", "Dark Side of the Moon", "Artist: Pink Floyd" },
-    { "3A006C7C8EA4", "VHS", "The Matrix", "Director: Wachowski" },
-    // Add more entries as needed
-};
-static const size_t tag_info_count = sizeof(tag_info_table) / sizeof(tag_info_table[0]);
 
 // Function to calculate the center-aligned X coordinate
 uint16_t calculate_center_aligned_x(const char *text, uint8_t scale)
@@ -84,7 +71,7 @@ void display_header(const char *header)
 
 void display_vinyl_record(const char *artist, const char *title, const char *song1, const char *song2, const char *song3, const char *genre, const char *year, const char *vinyl_weight)
 {
-    ili9341_fill_screen(0xFF, 0xFF, 0xFF);
+    // ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
     // Display the header in red
     display_header("Record Info");
@@ -133,89 +120,150 @@ void display_vinyl_record(const char *artist, const char *title, const char *son
     draw_vinyl_icon(TFT_WIDTH - 30, TFT_HEIGHT - 30);
 }
 
-const tag_info_t* get_tag_info(const char *tag_id) {
-    for (size_t i = 0; i < tag_info_count; i++) {
-        if (strcmp(tag_info_table[i].tag_id, tag_id) == 0) {
-            return &tag_info_table[i]; // Return pointer to matching entry
-        }
-    }
-    return NULL; // Return NULL if no match is found
+void display_vhs_movie(const char *director, const char *title, const char *actor1, const char *actor2, const char *actor3, const char *genre, const char *year, const char *vhs_weight)
+{
+    // ili9341_fill_screen(0xFF, 0xFF, 0xFF);
+
+    // Display the header in red
+    display_header("VHS Info");
+
+    char buffer[64];
+
+    // Display Director
+    snprintf(buffer, sizeof(buffer), "Director: %s", director);
+    uint16_t x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 60, buffer, 1, 0x00, 0x00, 0x00); // Black color
+
+    // Display Title
+    snprintf(buffer, sizeof(buffer), "Title: %s", title);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 90, buffer, 1, 0x00, 0x00, 0x00);
+
+    // Display Actors
+    snprintf(buffer, sizeof(buffer), "Actor: %s", actor1);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 120, buffer, 1, 0x00, 0x00, 0x00);
+
+    snprintf(buffer, sizeof(buffer), "Actor: %s", actor2);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 150, buffer, 1, 0x00, 0x00, 0x00);
+
+    snprintf(buffer, sizeof(buffer), "Actor: %s", actor3);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 180, buffer, 1, 0x00, 0x00, 0x00);
+
+    // Display Genre
+    snprintf(buffer, sizeof(buffer), "Genre: %s", genre);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 210, buffer, 1, 0x00, 0x00, 0x00);
+
+    // Display Year
+    snprintf(buffer, sizeof(buffer), "Year: %s", year);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 240, buffer, 1, 0x00, 0x00, 0x00);
+
+    // Display Weight
+    snprintf(buffer, sizeof(buffer), "Weight: %s lbs", vhs_weight);
+    x = calculate_right_aligned_x(buffer, 1);
+    ili9341_draw_string(x, 270, buffer, 1, 0x00, 0x00, 0x00);
+
+    // Draw VHS icon in the bottom right
+    draw_vhs_icon(TFT_WIDTH - 40, TFT_HEIGHT - 20);
 }
 
-// Display RFID tag information on the screen
-void display_rfid_tag_info(const char *tag_id) {
-    const tag_info_t *tag_info = get_tag_info(tag_id);
+void rfid_timer_callback(void *context)
+{
+	rfid_data_t tag_data; 
 
-    // ili9341_fill_screen(0xFF, 0xFF, 0xFF); // Clear screen to white
-
-    if (tag_info) {
-		display_vinyl_record(tag_info->artist, tag_info->title, tag_info->song1,tag_info->song2,tag_info->song3,tag_info->genre,tag_info->year, tag_info->sensed_weight);
-       
-    } else {
-        // Display "unknown tag" message
-        ili9341_draw_string(10, 50, "Unknown Tag", 1, 0x00, 0x00, 0x00);
-    }
-}
-
-void rfid_timer_callback(void *context) {
-    rfid_data_t tag_data; // Structure to hold the RFID tag ID and timestamp
-
-    // Attempt to read an RFID tag
     tag_data = rfid_read_tag(&m_twi_mngr);
 
-    if (tag_data.tag[0] != '\0') {
-        // Print the tag information
-        printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
-
-        // Display tag data on the screen
-        // ili9341_draw_string(10, 10, "RFID Tag Detected", 1, 0x00, 0x00, 0x00);
-        // ili9341_draw_string(10, 30, tag_data.tag, 1, 0x00, 0x00, 0x00);
-
-        // Example: Based on tag ID, show additional info
-        if (strcmp(tag_data.tag, "3A006C84D200") == 0) {
-			display_rfid_tag_info(tag_data.tag);
-        } else if (strcmp(tag_data.tag, "789012") == 0) {
-            ili9341_draw_string(10, 50, "Type: VHS", 1, 0x00, 0x00, 0x00);
-            // ili9341_draw_string(10, 70, "Title: Pulp Fiction", 1, 0x00, 0x00, 0x00);
+    if (strcmp(last_displayed_tag, tag_data.tag) != 0) {
+            printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
+            strcpy(last_displayed_tag, tag_data.tag); 
+            process_rfid_tag(tag_data.tag);
         }
-    } else {
-        // No tag detected
+     else if (!is_displaying_tag) {
         printf("No tag detected or read failed.\n");
     }
 
-    rfid_clear_tags(&m_twi_mngr); // Clear RFID tag buffer
+    rfid_clear_tags(&m_twi_mngr);
 }
 
+void process_rfid_tag(const char *tag_id)
+{
+    // Example data for vinyl record
+    const char *artist = "The Beatles";
+    const char *title = "Abbey Road";
+    const char *song1 = "Come Together";
+    const char *song2 = "Something";
+    const char *song3 = "Octopus Garden";
+    const char *genre = "Rock";
+    const char *year = "1969";
+    const char *vinyl_weight = "0.3";
 
-int main(void) {
-    printf("Starting application.\n");
+    // Example data for VHS movie
+    const char *director = "Tarantino";
+    const char *movie_title = "Pulp Fiction";
+    const char *actor1 = "John Travolta";
+    const char *actor2 = "Uma Thurman";
+    const char *actor3 = "Samuel Jackson";
+    const char *movie_genre = "Crime";
+    const char *movie_year = "1994";
+    const char *vhs_weight = "1";
 
-    // Initialize TWI Manager
+    // Check the tag ID and update the display accordingly
+    if (strncmp(tag_id, VINYL_TAG, strlen(VINYL_TAG)) == 0)
+    {
+        // Display vinyl record info
+        display_vinyl_record(artist, title, song1, song2, song3, genre, year, vinyl_weight);
+    }
+    else if (strncmp(tag_id, VHS_TAG, strlen(VHS_TAG)) == 0)
+    {
+        // Display VHS movie info
+        display_vhs_movie(director, movie_title, actor1, actor2, actor3, movie_genre, movie_year, vhs_weight);
+    }
+    else
+    {
+		is_displaying_tag = false; 
+        return;
+    }
+
+    is_displaying_tag = true;
+    strcpy(last_displayed_tag, tag_id);
+}
+
+int main(void)
+{
+    printf("Starting RFID and Display.\n");
+
+    // Initialize TWI manager
     nrf_drv_twi_config_t twi_config = NRF_DRV_TWI_DEFAULT_CONFIG;
     twi_config.scl = I2C_QWIIC_SCL;
     twi_config.sda = I2C_QWIIC_SDA;
     twi_config.frequency = NRF_TWIM_FREQ_100K;
+    twi_config.interrupt_priority = APP_IRQ_PRIORITY_HIGH;
 
     ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &twi_config);
     APP_ERROR_CHECK(err_code);
-    printf("TWI Manager initialized successfully\n");
+    printf("TWI Manager initialized successfully.\n");
 
     // Initialize RFID
     rfid_init(&m_twi_mngr);
-	printf("got to rfid init\n");
+    rfid_scan_bus(&m_twi_mngr);
 
-    // Initialize Display
+    // Initialize ILI9341 display
     ili9341_init();
-	printf("got to display init\n");
+	ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
-    // App timer setup
+    // Start RFID polling timer
     app_timer_init();
-	printf("got to app timer init\n");
     app_timer_create(&rfid_timer, APP_TIMER_MODE_REPEATED, rfid_timer_callback);
     app_timer_start(rfid_timer, POLLING_INTERVAL, NULL);
 
-    while (1) {
-        nrf_delay_ms(1000);
+    // Main loop
+    while (1)
+    {
+        nrf_delay_ms(1000); // Add delay for low-power consumption
     }
 
     return 0;
