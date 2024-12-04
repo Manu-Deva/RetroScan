@@ -7,14 +7,14 @@
 #include "app_timer.h"
 #include "microbit_v2.h"
 
-#define POLLING_INTERVAL APP_TIMER_TICKS(500) // Poll every 500ms
+#define POLLING_INTERVAL APP_TIMER_TICKS(250) // Poll every 500ms
 
 // TWI Manager instance
 NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);
 APP_TIMER_DEF(rfid_timer);
 
-#define VINYL_TAG "VINYL01" // Example RFID tag for vinyl records
-#define VHS_TAG "VHS001"    // Example RFID tag for VHS tapes
+#define VINYL_TAG "3A006C84D200" // Example RFID tag for vinyl records
+#define VHS_TAG "3A006C762F0F"    // Example RFID tag for VHS tapes
 
 // Function prototypes
 void rfid_timer_callback(void *context);

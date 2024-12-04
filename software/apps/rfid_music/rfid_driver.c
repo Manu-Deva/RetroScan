@@ -101,9 +101,9 @@ rfid_data_t rfid_read_tag(nrf_twi_mngr_t const *twi_mngr)
     // Parse the timestamp
     rfid_data.time = (buffer[6] << 24) | (buffer[7] << 16) | (buffer[8] << 8) | buffer[9];
 
-    // printf("RFID Data: \n");
-    // printf("  Tag: %s\n", rfid_data.tag);
-    // printf("  Time: %lu\n", rfid_data.time);
+    printf("RFID Data: \n");
+    printf("  Tag: %s\n", rfid_data.tag);
+    printf("  Time: %lu\n", rfid_data.time);
 
     return rfid_data;
 }
