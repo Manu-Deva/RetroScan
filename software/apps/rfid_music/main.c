@@ -7,7 +7,7 @@
 #include "app_timer.h"
 #include "microbit_v2.h"
 
-#define POLLING_INTERVAL APP_TIMER_TICKS(250) // Poll every 500ms
+#define POLLING_INTERVAL APP_TIMER_TICKS(500) // Poll every 500ms
 
 // TWI Manager instance
 NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);
@@ -15,6 +15,9 @@ APP_TIMER_DEF(rfid_timer);
 
 #define VINYL_TAG "3A006C84D200" // Example RFID tag for vinyl records
 #define VHS_TAG "3A006C762F0F"    // Example RFID tag for VHS tapes
+
+static char last_displayed_tag[13] = "";
+static bool is_displaying_tag = false;  // Whether a valid tag is currently displayed
 
 // Function prototypes
 void rfid_timer_callback(void *context);
@@ -68,7 +71,7 @@ void display_header(const char *header)
 
 void display_vinyl_record(const char *artist, const char *title, const char *song1, const char *song2, const char *song3, const char *genre, const char *year, const char *vinyl_weight)
 {
-    ili9341_fill_screen(0xFF, 0xFF, 0xFF);
+    // ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
     // Display the header in red
     display_header("Record Info");
@@ -119,7 +122,7 @@ void display_vinyl_record(const char *artist, const char *title, const char *son
 
 void display_vhs_movie(const char *director, const char *title, const char *actor1, const char *actor2, const char *actor3, const char *genre, const char *year, const char *vhs_weight)
 {
-    ili9341_fill_screen(0xFF, 0xFF, 0xFF);
+    // ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
     // Display the header in red
     display_header("VHS Info");
@@ -174,15 +177,12 @@ void rfid_timer_callback(void *context)
 
     tag_data = rfid_read_tag(&m_twi_mngr);
 
-    if (tag_data.tag[0] != '\0')
-    {
-        printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
-
-        // Process the tag to update the display
-        process_rfid_tag(tag_data.tag);
-    }
-    else
-    {
+    if (strcmp(last_displayed_tag, tag_data.tag) != 0) {
+            printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
+            strcpy(last_displayed_tag, tag_data.tag); 
+            process_rfid_tag(tag_data.tag);
+        }
+     else if (!is_displaying_tag) {
         printf("No tag detected or read failed.\n");
     }
 
@@ -224,10 +224,12 @@ void process_rfid_tag(const char *tag_id)
     }
     else
     {
-        // Unknown tag: clear the display
-        ili9341_fill_screen(0xFF, 0xFF, 0xFF); // Fill screen with white
-        display_header("Unknown Tag");
+		is_displaying_tag = false; 
+        return;
     }
+
+    is_displaying_tag = true;
+    strcpy(last_displayed_tag, tag_id);
 }
 
 int main(void)
@@ -251,6 +253,7 @@ int main(void)
 
     // Initialize ILI9341 display
     ili9341_init();
+	ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
     // Start RFID polling timer
     app_timer_init();
