@@ -7,40 +7,61 @@
 #include "app_timer.h"
 #include "microbit_v2.h"
 
-#define POLLING_INTERVAL APP_TIMER_TICKS(500) // Poll every 500ms
+#define POLLING_INTERVAL APP_TIMER_TICKS(500) 
+#define VINYL_TAG "3A006C84D200" 
+#define VHS_TAG "3A006C762F0F"    
+
+#define MAX_TAGS 10 
+#define TFT_WIDTH 240
+#define TFT_HEIGHT 320
+
+typedef struct {
+    const char *tag_id;  // RFID tag ID
+    const char *type;    // Object type (e.g., "Vinyl", "VHS")
+	const char *person;  // Director or Artist
+    const char *title;   // Title
+    const char *field1;  // Field 1 (e.g., song/actor)
+    const char *field2;  // Field 2
+    const char *field3;  // Field 3
+    const char *genre;   // Genre
+    const char *year;    // Year
+    const char *weight;  // Weight
+} tag_info_t;
+
+#define MAX_TAGS 10 
+
+static tag_info_t tag_info_table[MAX_TAGS] = {
+    { "3A006C84D200", "Vinyl", "The Beatles", "Abbey Road", "Come Together", "Something", "Octopus Garden", "Rock", "1969", "0.3" },
+    { "3A006C762F0F", "VHS", "Quentin Tarantino", "Pulp Fiction", "John Travolta", "Uma Thurman", "Samuel Jackson", "Crime", "1994", "1.0" },
+    // Add more entries as needed
+};
+static const size_t tag_info_count = sizeof(tag_info_table) / sizeof(tag_info_table[0]);
 
 // TWI Manager instance
 NRF_TWI_MNGR_DEF(m_twi_mngr, 1, 0);
 APP_TIMER_DEF(rfid_timer);
 
-#define VINYL_TAG "3A006C84D200" // Example RFID tag for vinyl records
-#define VHS_TAG "3A006C762F0F"    // Example RFID tag for VHS tapes
 
 static char last_displayed_tag[13] = "";
-static bool is_displaying_tag = false;  // Whether a valid tag is currently displayed
+static bool is_displaying_tag = false;  
 
 // Function prototypes
 void rfid_timer_callback(void *context);
 void process_rfid_tag(const char *tag_id);
 
-#define TFT_WIDTH 240
-#define TFT_HEIGHT 320
 
 // Function to calculate the center-aligned X coordinate
 uint16_t calculate_center_aligned_x(const char *text, uint8_t scale)
 {
     size_t length = 0;
 
-    // Calculate the string length
     while (text[length] != '\0')
     {
         length++;
     }
 
-    // Each character is 8 pixels wide (font size), scaled by `scale`
     uint16_t text_width = length * 8 * scale;
 
-    // Return the X position to center-align the text
     return (TFT_WIDTH - text_width) / 2;
 }
 
@@ -55,23 +76,23 @@ uint16_t calculate_right_aligned_x(const char *text, uint8_t scale)
         length++;
     }
 
-    // Each character is 8 pixels wide (font size), scaled by `scale`
+
     uint16_t text_width = length * 8 * scale;
 
-    // Return the X position to right-align the text
-    return TFT_WIDTH - text_width - 35; // Subtract 35 for padding
+    return TFT_WIDTH - text_width - 35; 
 }
 
 // Function to display a header at the top of the screen in red
 void display_header(const char *header)
 {
-    uint16_t x = calculate_center_aligned_x(header, 1);      // Center-align the header
-    ili9341_draw_string(x, 20, header, 1, 0xFF, 0x00, 0x00); // Red color
+    uint16_t x = calculate_center_aligned_x(header, 1);   
+    ili9341_draw_string(x, 20, header, 1, 0xFF, 0x00, 0x00); 
 }
 
 void display_vinyl_record(const char *artist, const char *title, const char *song1, const char *song2, const char *song3, const char *genre, const char *year, const char *vinyl_weight)
 {
-    // ili9341_fill_screen(0xFF, 0xFF, 0xFF);
+    ili9341_fill_screen(0xFF, 0x00, 0x00);
+	ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
     // Display the header in red
     display_header("Record Info");
@@ -122,7 +143,8 @@ void display_vinyl_record(const char *artist, const char *title, const char *son
 
 void display_vhs_movie(const char *director, const char *title, const char *actor1, const char *actor2, const char *actor3, const char *genre, const char *year, const char *vhs_weight)
 {
-    // ili9341_fill_screen(0xFF, 0xFF, 0xFF);
+    ili9341_fill_screen(0x00, 0x00, 0xFF);
+	ili9341_fill_screen(0xFF, 0xFF, 0xFF);
 
     // Display the header in red
     display_header("VHS Info");
@@ -189,47 +211,30 @@ void rfid_timer_callback(void *context)
     rfid_clear_tags(&m_twi_mngr);
 }
 
-void process_rfid_tag(const char *tag_id)
-{
-    // Example data for vinyl record
-    const char *artist = "The Beatles";
-    const char *title = "Abbey Road";
-    const char *song1 = "Come Together";
-    const char *song2 = "Something";
-    const char *song3 = "Octopus Garden";
-    const char *genre = "Rock";
-    const char *year = "1969";
-    const char *vinyl_weight = "0.3";
-
-    // Example data for VHS movie
-    const char *director = "Tarantino";
-    const char *movie_title = "Pulp Fiction";
-    const char *actor1 = "John Travolta";
-    const char *actor2 = "Uma Thurman";
-    const char *actor3 = "Samuel Jackson";
-    const char *movie_genre = "Crime";
-    const char *movie_year = "1994";
-    const char *vhs_weight = "1";
-
-    // Check the tag ID and update the display accordingly
-    if (strncmp(tag_id, VINYL_TAG, strlen(VINYL_TAG)) == 0)
-    {
-        // Display vinyl record info
-        display_vinyl_record(artist, title, song1, song2, song3, genre, year, vinyl_weight);
+const tag_info_t* get_tag_info(const char *tag_id) {
+    for (size_t i = 0; i < tag_info_count; i++) {
+        if (strcmp(tag_info_table[i].tag_id, tag_id) == 0) {
+            return &tag_info_table[i]; 
+        }
     }
-    else if (strncmp(tag_id, VHS_TAG, strlen(VHS_TAG)) == 0)
-    {
-        // Display VHS movie info
-        display_vhs_movie(director, movie_title, actor1, actor2, actor3, movie_genre, movie_year, vhs_weight);
-    }
-    else
-    {
-		is_displaying_tag = false; 
-        return;
-    }
+    return NULL; 
+}
 
-    is_displaying_tag = true;
-    strcpy(last_displayed_tag, tag_id);
+void process_rfid_tag(const char *tag_id) {
+    const tag_info_t *tag_info = get_tag_info(tag_id);
+
+    if (tag_info) {
+
+		if (strncmp(tag_id, VINYL_TAG, strlen(VINYL_TAG)) == 0) {
+            display_vinyl_record(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
+        } else if (strncmp(tag_id, VHS_TAG, strlen(VHS_TAG)) == 0) {
+            display_vhs_movie(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
+        }
+        is_displaying_tag = true;
+        strcpy(last_displayed_tag, tag_id);
+    } else {
+        is_displaying_tag = false;
+    }
 }
 
 int main(void)
@@ -263,7 +268,7 @@ int main(void)
     // Main loop
     while (1)
     {
-        nrf_delay_ms(1000); // Add delay for low-power consumption
+        nrf_delay_ms(1000); 
     }
 
     return 0;
