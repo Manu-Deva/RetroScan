@@ -33,7 +33,7 @@ typedef struct {
 
 static tag_info_t tag_info_table[MAX_TAGS] = {
     { "3A006C84D200", "Vinyl", "The Beatles", "Abbey Road", "Come Together", "Something", "Octopus Garden", "Rock", "1969", "0.3" },
-    { "3A006C762F0F", "VHS", "Tarantino", "Pulp Fiction", "John Travolta", "Uma Thurman", "Samuel Jackson", "Crime", "1994", "1.0" },
+    { "3A006C762F0F", "VHS", "Quentin Tarantino", "Pulp Fiction", "John Travolta", "Uma Thurman", "Samuel Jackson", "Crime", "1994", "1.0" },
 	{ "00000015C9DC", "Vinyl", "Radiohead", "In Rainbows", "All I Need", "Weird Fishes", "Videotape Garden", "Rock", "2007", "0.3" },
     // Add more entries as needed
 };
@@ -91,11 +91,10 @@ void display_header(const char *header)
     ili9341_draw_string(x, 20, header, 1, 0xFF, 0x00, 0x00); 
 }
 
-void display_vinyl_record(const char *artist, const char *title, const char *song1, const char *song2, const char *song3, const char *genre, const char *year, const char *vinyl_weight, uint8_t r, uint8_t g, uint8_t b )
+void display_vinyl_record(const char *artist, const char *title, const char *song1, const char *song2, const char *song3, const char *genre, const char *year, const char *vinyl_weight)
 {
-    ili9341_fill_screen(r, g, b);
+    ili9341_fill_screen(0xFF, 0x00, 0x00);
 	ili9341_fill_screen(0xFF, 0xFF, 0xFF);
-	
 
     // Display the header in red
     display_header("Record Info");
@@ -229,12 +228,12 @@ void process_rfid_tag(const char *tag_id) {
     if (tag_info) {
 
 		if (strncmp(tag_id, ABBEY_ROAD, strlen(ABBEY_ROAD)) == 0) {
-            display_vinyl_record(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight, 0xC5, 0xFB, 0xFF);
+            display_vinyl_record(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
         } else if (strncmp(tag_id, PULP_FICTION, strlen(PULP_FICTION)) == 0) {
             display_vhs_movie(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
         }
 		else if (strncmp(tag_id, IN_RAINBOWS, strlen(IN_RAINBOWS)) == 0) {
-            display_vinyl_record(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight, 0xF7, 0xEE, 0x49);
+            display_vhs_movie(tag_info->person, tag_info->title, tag_info->field1, tag_info->field2, tag_info->field3, tag_info->genre, tag_info->year, tag_info->weight);
         }
         is_displaying_tag = true;
         strcpy(last_displayed_tag, tag_id);
