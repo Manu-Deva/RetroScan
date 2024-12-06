@@ -6,6 +6,7 @@
 #include "nrf_delay.h"
 #include "app_timer.h"
 #include "microbit_v2.h"
+#include "nrf_drv_saadc.h"
 
 #define POLLING_INTERVAL APP_TIMER_TICKS(500) 
 #define ABBEY_ROAD "3A006C84D200" 
@@ -51,6 +52,29 @@ static bool is_displaying_tag = false;
 void rfid_timer_callback(void *context);
 void process_rfid_tag(const char *tag_id);
 
+// SAADC callback (empty)
+void saadc_callback(nrf_drv_saadc_evt_t const *p_event) {}
+
+void saadc_init(void)
+{
+    nrf_drv_saadc_config_t saadc_config = NRF_DRV_SAADC_DEFAULT_CONFIG;
+    saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;
+    nrf_drv_saadc_init(&saadc_config, saadc_callback);
+
+    nrf_saadc_channel_config_t channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+    nrf_drv_saadc_channel_init(0, &channel_config);
+}
+
+float read_fsr_weight(void) {
+    nrf_saadc_value_t saadc_value;
+    ret_code_t err_code = nrf_drv_saadc_sample_convert(0, &saadc_value);
+    APP_ERROR_CHECK(err_code);
+
+    // Convert SAADC value to weight in lbs (example scaling, adjust as necessary)
+    float weight = (float)saadc_value * 0.01;  // Adjust scale factor
+    return weight;
+}
+
 
 // Function to calculate the center-aligned X coordinate
 uint16_t calculate_center_aligned_x(const char *text, uint8_t scale)
@@ -90,6 +114,31 @@ void display_header(const char *header)
     uint16_t x = calculate_center_aligned_x(header, 1);   
     ili9341_draw_string(x, 20, header, 1, 0xFF, 0x00, 0x00); 
 }
+
+void display_weight(float weight) {
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "Weight lbs: %.1f", weight);
+	uint16_t x = calculate_right_aligned_x(buffer, 1);
+    
+    // Define the area for weight display
+    set_address_window(10, 280, 220, 20);  // Adjust dimensions as needed
+
+    // Draw the updated weight
+    ili9341_draw_string(x, 270, buffer, 1, 0x00, 0x00, 0x00);  // Black text
+}
+
+// void display_weight(float weight) {
+//     char buffer[32];
+//     snprintf(buffer, sizeof(buffer), "Weight lbs: %.1f", weight);
+//     uint16_t x = calculate_right_aligned_x(buffer, 1);
+
+//     // Define the area for weight display and clear it
+//     draw_rectangle(10, 270, 220, 20, 0xFF, 0xFF, 0xFF);  // Clear area with white
+
+//     // Draw the updated weight
+//     ili9341_draw_string(x, 270, buffer, 1, 0x00, 0x00, 0x00);  // Black text
+// }
+
 
 void display_vinyl_record(const char *artist, const char *title, const char *song1, const char *song2, const char *song3, const char *genre, const char *year, const char *vinyl_weight, uint8_t r, uint8_t g, uint8_t b )
 {
@@ -196,20 +245,22 @@ void display_vhs_movie(const char *director, const char *title, const char *acto
     draw_vhs_icon(TFT_WIDTH - 40, TFT_HEIGHT - 20);
 }
 
-void rfid_timer_callback(void *context)
-{
-	rfid_data_t tag_data; 
+void rfid_timer_callback(void *context) {
+    rfid_data_t tag_data;
 
     tag_data = rfid_read_tag(&m_twi_mngr);
 
     if (strcmp(last_displayed_tag, tag_data.tag) != 0) {
-            printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
-            strcpy(last_displayed_tag, tag_data.tag); 
-            process_rfid_tag(tag_data.tag);
-        }
-     else if (!is_displaying_tag) {
+        printf("Tag Detected: %s, Timestamp: %lu ms\n", tag_data.tag, tag_data.time);
+        strcpy(last_displayed_tag, tag_data.tag);
+        process_rfid_tag(tag_data.tag);
+    } else if (!is_displaying_tag) {
         printf("No tag detected or read failed.\n");
     }
+
+    // Read and display the weight
+    float weight = read_fsr_weight();
+    display_weight(weight);
 
     rfid_clear_tags(&m_twi_mngr);
 }
@@ -257,6 +308,8 @@ int main(void)
     ret_code_t err_code = nrf_twi_mngr_init(&m_twi_mngr, &twi_config);
     APP_ERROR_CHECK(err_code);
     printf("TWI Manager initialized successfully.\n");
+
+	saadc_init();
 
     // Initialize RFID
     rfid_init(&m_twi_mngr);
