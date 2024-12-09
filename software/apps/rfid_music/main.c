@@ -33,8 +33,8 @@ typedef struct {
 #define MAX_TAGS 10 
 
 static tag_info_t tag_info_table[MAX_TAGS] = {
-    { "3A006C84D200", "Vinyl", "The Beatles", "Abbey Road", "Come Together", "Something", "Octopus Garden", "Rock", "1969", "0.3" },
-    { "3A006C762F0F", "VHS", "Tarantino", "Pulp Fiction", "John Travolta", "Uma Thurman", "Samuel Jackson", "Crime", "1994", "1.0" },
+    { "3A006C84D200", "Vinyl", "Travis Scott", "Utopia", "Meltdown", "Thank God", "Fein", "Rap", "2023", "0.3" },
+    { "3A006C762F0F", "VHS", "Sonnenfeld", "Men in Black", "Will Smith", "Tommy Lee Jones", "Rip Torn", "Sci-Fi", "1997", "1.0" },
 	{ "00000015C9DC", "Vinyl", "Radiohead", "In Rainbows", "All I Need", "Weird Fishes", "Videotape Garden", "Rock", "2007", "0.3" },
     // Add more entries as needed
 };
