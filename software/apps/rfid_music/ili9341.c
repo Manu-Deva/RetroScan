@@ -163,7 +163,7 @@ void ili9341_fill_screen(uint8_t r, uint8_t g, uint8_t b)
 }
 
 // Set the address window for the drawing area
-static void set_address_window(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void set_address_window(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
 {
     uint16_t x2 = x + w - 1;
     uint16_t y2 = y + h - 1;
