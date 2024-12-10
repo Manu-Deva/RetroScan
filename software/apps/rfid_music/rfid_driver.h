@@ -10,7 +10,7 @@
 #define SPARKFUN_RFID_ADDR 0x7D
 #define DEFAULT_ADDR 0x7D
 
-#define TAG_ID_SIZE 16      // Total tag ID size (adjust as necessary)
+#define TAG_ID_SIZE 16      // Total tag ID size
 #define RFID_DATA_LENGTH 10 // 10 ASCII characters for the tag ID
 #define CHECKSUM_LENGTH 2   // 2 ASCII characters for the checksum
 
@@ -24,8 +24,9 @@
 #define MAX_TAG_STORAGE 20
 #define BYTES_IN_BUFFER 4
 
-typedef struct {
-    char tag[13]; // 6-character tag + null terminator
+typedef struct
+{
+    char tag[13];  // 6-character tag + null terminator
     uint32_t time; // Timestamp in milliseconds
 } rfid_data_t;
 
@@ -40,4 +41,3 @@ static void rfid_write_register(uint8_t i2c_addr, uint8_t reg_addr, uint8_t data
 void rfid_check_tag_present(nrf_twi_mngr_t const *twi_mngr);
 
 #endif
-
